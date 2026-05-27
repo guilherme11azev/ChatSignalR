@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat em Tempo Real — SignalR</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            color: #e94560;
+        }
+
+        #login-box {
+            background: #16213e;
+            padding: 30px;
+            border-radius: 12px;
+            width: 340px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        #chat-box {
+            display: none;
+            flex-direction: column;
+            width: 700px;
+            height: 580px;
+            background: #16213e;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        #chat-header {
+            background: #0f3460;
+            padding: 14px 20px;
+            font-weight: bold;
+            font-size: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #e94560;
+        }
+
+        #status-indicator.connected {
+            background: #4ecca3;
+        }
+
+        #salas {
+            display: flex;
+            gap: 8px;
+            padding: 10px 16px;
+            background: #0d2137;
+        }
+
+        .sala-btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 20px;
+            background: #0f3460;
+            color: #aaa;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .sala-btn.ativa {
+            background: #e94560;
+            color: white;
+        }
+
+        #mensagens {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .mensagem {
+            padding: 8px 12px;
+            border-radius: 8px;
+            max-width: 80%;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .mensagem.sistema {
+            background: #0f3460;
+            color: #aaa;
+            font-style: italic;
+            align-self: center;
+            max-width: 100%;
+            text-align: center;
+            font-size: 0.8rem;
+        }
+
+        .mensagem.proprio {
+            background: #e94560;
+            color: white;
+            align-self: flex-end;
+        }
+
+        .mensagem.outro {
+            background: #0f3460;
+            color: #eee;
+            align-self: flex-start;
+        }
+
+        .mensagem .autor {
+            font-size: 0.75rem;
+            opacity: 0.7;
+            margin-bottom: 3px;
+        }
+
+        #input-area {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px;
+            background: #0d2137;
+        }
+
+        input, button, select {
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: none;
+            outline: none;
+            font-size: 0.95rem;
+        }
+
+        input {
+            background: #0f3460;
+            color: white;
+            flex: 1;
+        }
+
+        input::placeholder { color: #666; }
+
+        button {
+            background: #e94560;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            transition: opacity 0.2s;
+        }
+
+        button:hover { opacity: 0.85; }
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        select {
+            background: #0f3460;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>💬 Chat em Tempo Real</h1>
+
+    <!-- Tela de login -->
+    <div id="login-box">
+        <input id="input-usuario" type="text" placeholder="Seu nome de usuário" maxlength="20" />
+        <select id="select-sala">
+            <option value="geral">Sala Geral</option>
+            <option value="vip">Sala VIP</option>
+            <option value="suporte">Sala Suporte</option>
+        </select>
+        <button id="btn-entrar">Entrar no Chat</button>
+    </div>
+
+    <!-- Tela do chat -->
+    <div id="chat-box">
+        <div id="chat-header">
+            <span id="chat-titulo">Chat</span>
+            <div id="status-indicator"></div>
+        </div>
+
+        <div id="salas">
+            <span style="font-size:0.85rem; color:#aaa; align-self:center;">Trocar sala:</span>
+            <button class="sala-btn" data-sala="geral">Geral</button>
+            <button class="sala-btn" data-sala="vip">VIP</button>
+            <button class="sala-btn" data-sala="suporte">Suporte</button>
+        </div>
+
+        <div id="mensagens"></div>
+
+        <div id="input-area">
+            <input id="input-mensagem" type="text" placeholder="Digite sua mensagem..." maxlength="200" />
+            <button id="btn-enviar">Enviar</button>
+        </div>
+    </div>
+
+    <!-- Biblioteca cliente do SignalR via CDN -->
+    <script src="/signalr.min.js"></script>
+
+
+    <script>
+        let connection = null;
+        let usuario = "";
+        let salaAtual = "";
+
+        // --- Elementos do DOM ---
+        const loginBox = document.getElementById("login-box");
+        const chatBox = document.getElementById("chat-box");
+        const inputUsuario = document.getElementById("input-usuario");
+        const inputMensagem = document.getElementById("input-mensagem");
+        const btnEntrar = document.getElementById("btn-entrar");
+        const btnEnviar = document.getElementById("btn-enviar");
+        const mensagensDiv = document.getElementById("mensagens");
+        const statusIndicator = document.getElementById("status-indicator");
+        const chatTitulo = document.getElementById("chat-titulo");
+
+        // --- Entrar no chat ---
+        btnEntrar.addEventListener("click", async () => {
+            const nome = inputUsuario.value.trim();
+            const sala = document.getElementById("select-sala").value;
+
+            if (!nome) {
+                alert("Digite seu nome de usuário");
+                return;
+            }
+
+            usuario = nome;
+            salaAtual = sala;
+
+            await iniciarConexao();
+        });
+
+        // --- Iniciar conexão com o Hub ---
+        async function iniciarConexao() {
+            connection = new signalR.HubConnectionBuilder()
+                .withUrl("/chatHub")
+                .withAutomaticReconnect()
+                .build();
+
+            // Recebe mensagens do servidor
+            connection.on("ReceberMensagem", (autor, mensagem) => {
+                exibirMensagem(autor, mensagem);
+            });
+
+            // Eventos de reconexão
+            connection.onreconnecting(() => {
+                statusIndicator.classList.remove("connected");
+            });
+
+            connection.onreconnected(() => {
+                statusIndicator.classList.add("connected");
+            });
+
+            try {
+                await connection.start();
+                statusIndicator.classList.add("connected");
+
+                // Entra na sala escolhida
+                await connection.invoke("EntrarNaSala", usuario, salaAtual);
+
+                // Troca de tela
+                loginBox.style.display = "none";
+                chatBox.style.display = "flex";
+                chatTitulo.textContent = `${usuario} — Sala: ${salaAtual}`;
+
+                // Marca sala ativa
+                marcarSalaAtiva(salaAtual);
+
+                inputMensagem.focus();
+            } catch (err) {
+                alert("Erro ao conectar: " + err);
+            }
+        }
+
+        // --- Enviar mensagem ---
+        btnEnviar.addEventListener("click", enviarMensagem);
+
+        inputMensagem.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") enviarMensagem();
+        });
+
+        async function enviarMensagem() {
+            const mensagem = inputMensagem.value.trim();
+            if (!mensagem || !connection) return;
+
+            await connection.invoke("EnviarMensagemParaSala", usuario, salaAtual, mensagem);
+            inputMensagem.value = "";
+        }
+
+        // --- Trocar de sala ---
+        document.querySelectorAll(".sala-btn").forEach(btn => {
+            btn.addEventListener("click", async () => {
+                const novaSala = btn.dataset.sala;
+                if (novaSala === salaAtual) return;
+
+                await connection.invoke("EntrarNaSala", usuario, novaSala);
+                salaAtual = novaSala;
+                chatTitulo.textContent = `${usuario} — Sala: ${salaAtual}`;
+                marcarSalaAtiva(salaAtual);
+
+                exibirMensagem("Sistema", `Você entrou na sala ${novaSala}`);
+            });
+        });
+
+        // --- Exibir mensagem na tela ---
+        function exibirMensagem(autor, mensagem) {
+            const div = document.createElement("div");
+
+            if (autor === "Sistema") {
+                div.className = "mensagem sistema";
+                div.textContent = mensagem;
+            } else if (autor === usuario) {
+                div.className = "mensagem proprio";
+                div.innerHTML = `<div class="autor">Você</div>${mensagem}`;
+            } else {
+                div.className = "mensagem outro";
+                div.innerHTML = `<div class="autor">${autor}</div>${mensagem}`;
+            }
+
+            mensagensDiv.appendChild(div);
+            mensagensDiv.scrollTop = mensagensDiv.scrollHeight;
+        }
+
+        // --- Marcar sala ativa visualmente ---
+        function marcarSalaAtiva(sala) {
+            document.querySelectorAll(".sala-btn").forEach(btn => {
+                btn.classList.toggle("ativa", btn.dataset.sala === sala);
+            });
+        }
+    </script>
+
+</body>
+</html>
