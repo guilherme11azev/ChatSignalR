@@ -1,10 +1,10 @@
-# 💬 ChatSignalR
+# ChatSignalR
 
 Aplicação de chat em tempo real construída com ASP.NET Core e SignalR. Usuários conectados trocam mensagens instantaneamente, sem recarregar a página, usando WebSockets.
 
 ---
 
-## 🚀 Tecnologias utilizadas
+##  Tecnologias utilizadas
 
 - [.NET 10](https://dotnet.microsoft.com/) — Framework principal
 - [ASP.NET Core](https://learn.microsoft.com/aspnet/core) — Backend da aplicação
@@ -13,7 +13,7 @@ Aplicação de chat em tempo real construída com ASP.NET Core e SignalR. Usuár
 
 ---
 
-## ⚙️ Como executar o projeto
+##  Como executar o projeto
 
 ### Pré-requisitos
 
@@ -38,7 +38,7 @@ Para testar o tempo real, **abra duas abas** com nomes de usuário diferentes e 
 
 ---
 
-## 💡 Funcionalidades
+##  Funcionalidades
 
 - Entrar no chat com nome de usuário
 - Escolher entre três salas: Geral, VIP e Suporte
@@ -50,7 +50,7 @@ Para testar o tempo real, **abra duas abas** com nomes de usuário diferentes e 
 
 ---
 
-## 🏗️ Como funciona
+##  Como funciona
 
 O SignalR mantém uma conexão persistente entre o navegador e o servidor via WebSockets. Quando um usuário envia uma mensagem, o servidor a repassa instantaneamente para todos os clientes conectados na mesma sala — sem necessidade de requisições HTTP adicionais.
 Cliente A ──┐
@@ -64,7 +64,7 @@ O `ChatHub` gerencia as conexões e expõe três métodos:
 
 ---
 
-## 🧠 Conceitos aplicados
+##  Conceitos aplicados
 
 - **SignalR Hubs** — classe central que gerencia conexões e mensagens
 - **WebSockets** — protocolo de comunicação bidirecional e persistente
